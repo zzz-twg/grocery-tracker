@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grocery Tracker</title>
+<style>
+  :root {
+    --foam: #EAF6F6; --card: #ffffff; --navy: #0B3C5D; --teal: #1D8A99; --aqua: #2EC4B6;
+    --sand: #F6EFE0; --coral: #FF7F6B; --text: #12333f; --muted: #5d7f8a; --line: #cfe6e8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: var(--foam); color: var(--text); }
+  header { background: linear-gradient(135deg, var(--navy), var(--teal) 60%, var(--aqua)); color: #fff; padding: 22px 16px 34px; position: relative; }
+  header::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 22px;
+    background: radial-gradient(circle at 12px -4px, transparent 14px, var(--foam) 15px) repeat-x; background-size: 24px 22px; }
+  header h1 { margin: 0; font-size: 1.6rem; }
+  header p { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+  main { max-width: 1250px; margin: 0 auto; padding: 16px; }
+  .card { background: var(--card); border-radius: 14px; box-shadow: 0 2px 10px rgba(11,60,93,.10); padding: 16px; margin-bottom: 16px; }
+  .card h2 { margin: 0 0 12px; font-size: 1.05rem; color: var(--navy); }
+  form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  label { display: flex; flex-direction: column; font-size: .78rem; color: var(--muted); gap: 3px; }
+  input, select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fbfefe; color: var(--text); }
+  input:focus, select:focus { outline: 2px solid var(--aqua); border-color: var(--aqua); }
+  .wide { grid-column: span 2; }
+  .actions { display: flex; gap: 8px; align-items: end; }
+  button { font: inherit; border: 0; border-radius: 8px; padding: 9px 16px; cursor: pointer; background: var(--teal); color: #fff; }
+  button:hover { background: var(--navy); }
+  button.alt { background: #d9eef0; color: var(--navy); }
+  button.alt:hover { background: #bfe3e6; }
+  button.danger { background: var(--coral); }
+  button.small { padding: 4px 10px; font-size: .8rem; }
+  .stats { display: flex; flex-wrap: wrap; gap: 12px; }
+  .stat { flex: 1 1 160px; background: linear-gradient(135deg, #e1f4f4, #f4fbfb); border-radius: 12px; padding: 12px 14px; }
+  .stat b { display: block; font-size: 1.4rem; color: var(--navy); }
+  .stat span { font-size: .78rem; color: var(--muted); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: center; }
+  .toolbar input[type=search] { flex: 1 1 200px; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 1000px; font-size: .88rem; }
+  th { background: var(--navy); color: #fff; text-align: left; padding: 10px; white-space: nowrap; cursor: pointer; user-select: none; }
+  th:first-child { border-radius: 8px 0 0 0; } th:last-child { border-radius: 0 8px 0 0; cursor: default; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  tbody tr:hover { background: #e6f6f6; }
+  tr.out td { background: #ffe9e5; }
+  tr.buy td:nth-child(5) { font-weight: 600; color: var(--teal); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tag { background: #d9eef0; color: var(--navy); border-radius: 999px; padding: 2px 10px; font-size: .78rem; white-space: nowrap; }
+  .empty { text-align: center; color: var(--muted); padding: 24px; }
+  .row-actions { white-space: nowrap; display: flex; gap: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🌊 Grocery Tracker</h1>
+  <p>Keep tabs on stock, top-ups and costs.</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2 id="formTitle">Add item</h2>
+    <form id="form">
+      <label>Date <input type="date" id="date" required></label>
+      <label>Category <select id="category" required></select></label>
+      <label class="wide">Item name <input type="text" id="name" required maxlength="80" placeholder="e.g. Oat milk"></label>
+      <label>Units Balance <input type="number" id="balance" min="0" step="any" value="0" required></label>
+      <label>Units to Top Up <input type="number" id="topup" min="0" step="any" value="0" required></label>
+      <label>Cost Per Unit <input type="number" id="cost" min="0" step="0.01" value="0" required></label>
+      <label>Packaging Type <select id="packaging"></select></label>
+      <label id="pkgOtherWrap" hidden>Specify packaging <input type="text" id="pkgOther" maxlength="30"></label>
+      <label>Weight / Size Per Unit <input type="text" id="size" maxlength="30" placeholder="e.g. 500 g, 1 L"></label>
+      <label class="wide">Comments <input type="text" id="comments" maxlength="200"></label>
+      <div class="actions">
+        <button type="submit" id="saveBtn">Add item</button>
+        <button type="button" class="alt" id="cancelBtn" hidden>Cancel</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card stats">
+    <div class="stat"><b id="sItems">0</b><span>Items</span></div>
+    <div class="stat"><b id="sBuy">0</b><span>Items to top up</span></div>
+    <div class="stat"><b id="sOut">0</b><span>Out of stock</span></div>
+    <div class="stat"><b id="sCost">0.00</b><span>Est. top-up cost</span></div>
+  </section>
+
+  <section class="card">
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Search items, comments…">
+      <select id="filterCat"></select>
+      <label style="flex-direction:row;align-items:center;gap:6px">Currency <input type="text" id="currency" maxlength="4" style="width:60px"></label>
+      <button class="alt" id="exportBtn">Export CSV</button>
+      <button class="alt" id="importBtn">Import CSV</button>
+      <input type="file" id="importFile" accept=".csv" hidden>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr id="headRow"></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var CATEGORIES = ["Breakfast","Lunch","Dinner","Staple","Body Care","Personal Care","Supplements","Others"];
+  var PACKAGING = ["Bottle","Packet","Box","Can","Tube","Jar","Bag","Sachet","Other"];
+  var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var COLS = [
+    { key: "date", label: "Date" }, { key: "category", label: "Category" }, { key: "name", label: "Item" },
+    { key: "balance", label: "Units Balance", num: true }, { key: "topup", label: "Units to Top Up", num: true },
+    { key: "cost", label: "Cost Per Unit", num: true }, { key: "packaging", label: "Packaging" },
+    { key: "size", label: "Weight / Size" }, { key: "comments", label: "Comments" },
+    { key: "total", label: "Est. Top-Up Cost", num: true }
+  ];
+  var STORE = "groceryTracker.v1", CUR = "groceryTracker.currency";
+
+  var items = [], editId = null, sortKey = "date", sortDir = -1, currency = "$";
+  var $ = function (id) { return document.getElementById(id); };
+
+  function load() {
+    try { items = JSON.parse(localStorage.getItem(STORE)) || []; } catch (e) { items = []; }
+    try { currency = localStorage.getItem(CUR) || "$"; } catch (e) { currency = "$"; }
+  }
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify(items)); } catch (e) { alert("Could not save to browser storage."); }
+  }
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function todayISO() { var d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function fmtDate(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return m ? m[3] + "-" + MONTHS[+m[2] - 1] + "-" + m[1] : (iso || "");
+  }
+  function parseDate(s) { // accepts yyyy-mm-dd or dd-mmm-yyyy
+    s = (s || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(s);
+    if (m) {
+      var i = MONTHS.map(function (x) { return x.toLowerCase(); }).indexOf(m[2].toLowerCase());
+      if (i > -1) return m[3] + "-" + pad(i + 1) + "-" + pad(+m[1]);
+    }
+    return todayISO();
+  }
+  function money(n) { return currency + (Number(n) || 0).toFixed(2); }
+  function total(it) { return (Number(it.topup) || 0) * (Number(it.cost) || 0); }
+
+  function fillSelect(sel, list, firstLabel) {
+    sel.textContent = "";
+    if (firstLabel) { var o = document.createElement("option"); o.value = ""; o.textContent = firstLabel; sel.appendChild(o); }
+    list.forEach(function (v) { var o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); });
+  }
+
+  function resetForm() {
+    editId = null;
+    $("form").reset();
+    $("date").value = todayISO();
+    $("pkgOtherWrap").hidden = true;
+    $("formTitle").textContent = "Add item";
+    $("saveBtn").textContent = "Add item";
+    $("cancelBtn").hidden = true;
+  }
+
+  function onSubmit(e) {
+    e.preventDefault();
+    var pkg = $("packaging").value;
+    if (pkg === "Other") pkg = $("pkgOther").value.trim() || "Other";
+    var rec = {
+      id: editId || String(Date.now()) + Math.random().toString(36).slice(2, 6),
+      date: $("date").value || todayISO(),
+      category: $("category").value,
+      name: $("name").value.trim(),
+      balance: Number($("balance").value) || 0,
+      topup: Number($("topup").value) || 0,
+      cost: Number($("cost").value) || 0,
+      packaging: pkg,
+      size: $("size").value.trim(),
+      comments: $("comments").value.trim()
+    };
+    if (!rec.name) return;
+    if (editId) {
+      items = items.map(function (x) { return x.id === editId ? rec : x; });
+    } else {
+      items.push(rec);
+    }
+    save(); resetForm(); render();
+  }
+
+  function startEdit(id) {
+    var it = items.filter(function (x) { return x.id === id; })[0];
+    if (!it) return;
+    editId = id;
+    $("date").value = it.date; $("category").value = it.category; $("name").value = it.name;
+    $("balance").value = it.balance; $("topup").value = it.topup; $("cost").value = it.cost;
+    if (PACKAGING.indexOf(it.packaging) > -1) { $("packaging").value = it.packaging; $("pkgOtherWrap").hidden = true; }
+    else { $("packaging").value = "Other"; $("pkgOtherWrap").hidden = false; $("pkgOther").value = it.packaging; }
+    $("size").value = it.size; $("comments").value = it.comments;
+    $("formTitle").textContent = "Edit item";
+    $("saveBtn").textContent = "Save changes";
+    $("cancelBtn").hidden = false;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function remove(id) {
+    var it = items.filter(function (x) { return x.id === id; })[0];
+    if (it && confirm("Delete \"" + it.name + "\"?")) {
+      items = items.filter(function (x) { return x.id !== id; });
+      if (editId === id) resetForm();
+      save(); render();
+    }
+  }
+
+  function val(it, key) { return key === "total" ? total(it) : it[key]; }
+
+  function visible() {
+    var q = $("search").value.trim().toLowerCase(), cat = $("filterCat").value;
+    var list = items.filter(function (it) {
+      if (cat && it.category !== cat) return false;
+      if (!q) return true;
+      return [it.name, it.comments, it.size, it.packaging, it.category].join(" ").toLowerCase().indexOf(q) > -1;
+    });
+    list.sort(function (a, b) {
+      var x = val(a, sortKey), y = val(b, sortKey);
+      if (typeof x === "number" && typeof y === "number") return (x - y) * sortDir;
+      return String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: "base" }) * sortDir;
+    });
+    return list;
+  }
+
+  function td(text, cls) { var c = document.createElement("td"); c.textContent = text; if (cls) c.className = cls; return c; }
+
+  function render() {
+    var list = visible(), body = $("body");
+    body.textContent = "";
+    if (!list.length) {
+      var r = document.createElement("tr"), c = td(items.length ? "No items match your filter." : "No items yet — add your first one above.", "empty");
+      c.colSpan = COLS.length + 1; r.appendChild(c); body.appendChild(r);
+    }
+    list.forEach(function (it) {
+      var tr = document.createElement("tr");
+      if (it.balance <= 0) tr.className = "out"; else if (it.topup > 0) tr.className = "buy";
+      tr.appendChild(td(fmtDate(it.date)));
+      var cc = document.createElement("td"), tag = document.createElement("span");
+      tag.className = "tag"; tag.textContent = it.category; cc.appendChild(tag); tr.appendChild(cc);
+      tr.appendChild(td(it.name));
+      tr.appendChild(td(it.balance, "num"));
+      tr.appendChild(td(it.topup, "num"));
+      tr.appendChild(td(money(it.cost), "num"));
+      tr.appendChild(td(it.packaging));
+      tr.appendChild(td(it.size));
+      tr.appendChild(td(it.comments));
+      tr.appendChild(td(money(total(it)), "num"));
+      var ac = document.createElement("td"); ac.className = "row-actions";
+      var eb = document.createElement("button"); eb.className = "small alt"; eb.textContent = "Edit";
+      eb.addEventListener("click", function () { startEdit(it.id); });
+      var db = document.createElement("button"); db.className = "small danger"; db.textContent = "Delete";
+      db.addEventListener("click", function () { remove(it.id); });
+      ac.appendChild(eb); ac.appendChild(db); tr.appendChild(ac);
+      body.appendChild(tr);
+    });
+    $("sItems").textContent = items.length;
+    $("sBuy").textContent = items.filter(function (i) { return i.topup > 0; }).length;
+    $("sOut").textContent = items.filter(function (i) { return i.balance <= 0; }).length;
+    $("sCost").textContent = money(items.reduce(function (s, i) { return s + total(i); }, 0));
+    renderHead();
+  }
+
+  function renderHead() {
+    var hr = $("headRow"); hr.textContent = "";
+    COLS.forEach(function (c) {
+      var th = document.createElement("th");
+      th.textContent = c.label + (sortKey === c.key ? (sortDir > 0 ? " ▲" : " ▼") : "");
+      th.addEventListener("click", function () {
+        if (sortKey === c.key) sortDir = -sortDir; else { sortKey = c.key; sortDir = 1; }
+        render();
+      });
+      hr.appendChild(th);
+    });
+    var a = document.createElement("th"); a.textContent = "Actions"; hr.appendChild(a);
+  }
+
+  // ---- CSV ----
+  var HEAD = ["Date","Category","Item","Units Balance","Units to Top Up","Cost Per Unit","Packaging Type","Weight/Size Per Unit","Comments"];
+  function csvCell(v) {
+    v = String(v == null ? "" : v);
+    if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; // neutralise spreadsheet formulas
+    return '"' + v.replace(/"/g, '""') + '"';
+  }
+  function exportCSV() {
+    var rows = [HEAD.map(csvCell).join(",")];
+    items.forEach(function (it) {
+      rows.push([fmtDate(it.date), it.category, it.name, it.balance, it.topup, it.cost, it.packaging, it.size, it.comments].map(csvCell).join(","));
+    });
+    var blob = new Blob(["﻿" + rows.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "grocery-tracker.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  function parseCSV(text) {
+    var rows = [], row = [], cur = "", q = false, i, ch;
+    text = text.replace(/^﻿/, "");
+    for (i = 0; i < text.length; i++) {
+      ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === ",") { row.push(cur); cur = ""; }
+      else if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && text[i + 1] === "\n") i++;
+        row.push(cur); cur = ""; rows.push(row); row = [];
+      } else cur += ch;
+    }
+    if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+    return rows.filter(function (r) { return r.some(function (c) { return c.trim() !== ""; }); });
+  }
+  function importCSV(file) {
+    var rd = new FileReader();
+    rd.onload = function () {
+      var rows = parseCSV(String(rd.result)).slice(1), added = 0;
+      rows.forEach(function (r) {
+        if (!r[2] || !r[2].trim()) return;
+        var cat = CATEGORIES.indexOf(r[1]) > -1 ? r[1] : "Others";
+        items.push({
+          id: String(Date.now()) + Math.random().toString(36).slice(2, 6),
+          date: parseDate(r[0]), category: cat, name: r[2].trim(),
+          balance: Number(r[3]) || 0, topup: Number(r[4]) || 0, cost: Number(r[5]) || 0,
+          packaging: (r[6] || "").trim(), size: (r[7] || "").trim(), comments: (r[8] || "").trim()
+        });
+        added++;
+      });
+      save(); render(); alert("Imported " + added + " item(s).");
+    };
+    rd.readAsText(file);
+  }
+
+  // ---- init ----
+  load();
+  fillSelect($("category"), CATEGORIES);
+  fillSelect($("filterCat"), CATEGORIES, "All categories");
+  fillSelect($("packaging"), PACKAGING);
+  $("currency").value = currency;
+  resetForm();
+  $("form").addEventListener("submit", onSubmit);
+  $("cancelBtn").addEventListener("click", resetForm);
+  $("packaging").addEventListener("change", function () { $("pkgOtherWrap").hidden = this.value !== "Other"; });
+  // keep the date picker on today's date whenever a new item is being entered
+  function refreshDate() { if (!editId) $("date").value = todayISO(); }
+  window.addEventListener("focus", refreshDate);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) refreshDate(); });
+  $("date").addEventListener("blur", function () { if (!this.value) this.value = todayISO(); });
+  $("search").addEventListener("input", render);
+  $("filterCat").addEventListener("change", render);
+  $("currency").addEventListener("input", function () {
+    currency = this.value; try { localStorage.setItem(CUR, currency); } catch (e) {}
+    render();
+  });
+  $("exportBtn").addEventListener("click", exportCSV);
+  $("importBtn").addEventListener("click", function () { $("importFile").click(); });
+  $("importFile").addEventListener("change", function () { if (this.files[0]) importCSV(this.files[0]); this.value = ""; });
+  render();
+})();
+</script>
+</body>
+</html>
